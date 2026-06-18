@@ -4,11 +4,10 @@ const jwt = require('jsonwebtoken');
 
 const router = express.Router();
 
-// Middleware for token-based authentication  
+// Middleware for token verification
 const authenticateToken = (req, res, next) => {
     const token = req.headers['authorization'] && req.headers['authorization'].split(' ')[1];
     if (!token) return res.sendStatus(401);
-
     jwt.verify(token, process.env.TOKEN_SECRET, (err, user) => {
         if (err) return res.sendStatus(403);
         req.user = user;
@@ -16,29 +15,26 @@ const authenticateToken = (req, res, next) => {
     });
 };
 
-// Fetch call recordings and funding information  
+// API Endpoint to fetch call recordings and funding info
 router.get('/call-recordings', authenticateToken, async (req, res) => {
     try {
-        const response = await axios.get('https://externalapi.com/callRecordings');
-        const callRecordings = response.data;
+        // Fetch Call Recordings
+        const recordingsResponse = await axios.get('https://external-api.com/call-recordings');
+        const recordings = recordingsResponse.data;
 
-        // Assuming that funding info can be fetched from another endpoint  
-        const fundingResponses = await Promise.all(callRecordings.map(recording => 
-            axios.get(`https://externalapi.com/fundingInfo/${recording.id}`)
-        ));
-
-        const fundingInfo = fundingResponses.map(resp => resp.data);
-
-        // Structure the response  
-        const structuredResponse = callRecordings.map((recording, index) => ({
-            recording,
-            funding: fundingInfo[index],
+        // Fetch Funding Info related to each recording
+        const fundedRecordings = await Promise.all(recordings.map(async (recording) => {
+            const fundingResponse = await axios.get(`https://external-api.com/funding/${recording.fundingId}`);
+            return {
+                ...recording,
+                fundingInfo: fundingResponse.data,
+            };
         }));
 
-        res.json(structuredResponse);
+        res.status(200).json(fundedRecordings);
     } catch (error) {
         console.error(error);
-        res.sendStatus(500);
+        res.status(500).json({ message: 'Error fetching data' });
     }
 });
 
