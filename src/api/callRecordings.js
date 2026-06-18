@@ -1,15 +1,20 @@
 const express = require('express');
 const axios = require('axios');
 const jwt = require('jsonwebtoken');
+
 const router = express.Router();
 
-// Middleware for token verification
+// Middleware for token-based authentication
 router.use((req, res, next) => {
-    const token = req.headers['authorization']?.split(' ')[1];
-    if (!token) return res.status(401).send('Access Denied');
-    jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
-        if (err) return res.status(403).send('Invalid Token');
-        req.user = user;
+    const token = req.headers['authorization'];
+    if (!token) {
+        return res.status(403).send('Token is required.');
+    }
+    jwt.verify(token, process.env.JWT_SECRET, (err, decoded) => {
+        if (err) {
+            return res.status(401).send('Invalid token.');
+        }
+        req.user = decoded;
         next();
     });
 });
@@ -17,22 +22,26 @@ router.use((req, res, next) => {
 // Endpoint to fetch call recordings
 router.get('/call-recordings', async (req, res) => {
     try {
-        const response = await axios.get('https://externalapi.com/call-recordings');
-        const callRecordings = response.data.map(record => ({
-            id: record.id,
-            title: record.title,
-            date: record.date
-        }));
+        const response = await axios.get('https://api.external.com/callRecordings', {
+            headers: { 'Authorization': `Bearer ${process.env.EXTERNAL_API_TOKEN}` }
+        });
 
-        const fundingInfoResponses = await Promise.all(callRecordings.map(record => 
-            axios.get(`https://externalapi.com/funding-info/${record.id}`)
-        ));
+        const callRecordings = response.data;
+        let formattedResponse = [];
 
-        const fundingInfo = fundingInfoResponses.map(response => response.data);
+        for (const recording of callRecordings) {
+            let fundingInfo = await axios.get(`https://api.external.com/funding/${recording.id}`, {
+                headers: { 'Authorization': `Bearer ${process.env.EXTERNAL_API_TOKEN}` }
+            });
+            formattedResponse.push({
+                recording,
+                funding: fundingInfo.data
+            });
+        }
 
-        res.json({ callRecordings, fundingInfo });
+        return res.status(200).json(formattedResponse);
     } catch (error) {
-        res.status(500).send('Error fetching data');
+        return res.status(500).send('Error fetching data.');
     }
 });
 
