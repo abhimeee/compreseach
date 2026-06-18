@@ -4,36 +4,36 @@ const jwt = require('jsonwebtoken');
 
 const router = express.Router();
 
-// Middleware for token-based authentication
-const authenticateToken = (req, res, next) => {
-    const token = req.headers['authorization'] && req.headers['authorization'].split(' ')[1];
-    if (!token) return res.sendStatus(401);
-    jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (err) => {
-        if (err) return res.sendStatus(403);
+// Middleware for token authentication
+router.use((req, res, next) => {
+    const token = req.headers['authorization'];
+    if (!token) return res.status(403).json({ error: 'No token provided' });
+
+    jwt.verify(token, process.env.JWT_SECRET, (err) => {
+        if (err) return res.status(500).json({ error: 'Failed to authenticate token' });
         next();
     });
-};
+});
 
 // Endpoint to fetch call recordings
-router.get('/call-recordings', authenticateToken, async (req, res) => {
+router.get('/call-recordings', async (req, res) => {
     try {
-        const response = await axios.get('https://external-api.com/call-recordings'); // Replace with actual external API
+        const response = await axios.get('https://external-api.com/call-recordings');
         const callRecordings = response.data;
 
-        const fundingInfo = await Promise.all(callRecordings.map(async (recording) => {
-            const fundingResponse = await axios.get(`https://external-api.com/funding/${recording.id}`); // Replace with actual funding API
-            return fundingResponse.data;
+        // Process each recording to fetch related funding info
+        const results = await Promise.all(callRecordings.map(async (recording) => {
+            const fundingResponse = await axios.get(`https://external-api.com/funding-info/${recording.id}`);
+            return {  
+                recording,
+                funding: fundingResponse.data
+            };
         }));
 
-        const formattedResponse = callRecordings.map((recording, index) => ({
-            recording,
-            funding: fundingInfo[index]
-        }));
-
-        res.json(formattedResponse);
+        res.json(results);
     } catch (error) {
-        console.error('Error fetching call recordings or funding info:', error);
-        res.status(500).json({ message: 'Internal Server Error' });
+        console.error(error);
+        res.status(500).json({ error: 'Failed to fetch call recordings' });
     }
 });
 
