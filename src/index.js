@@ -1,11 +1,14 @@
 const express = require('express');
+const callRecordingsRouter = require('./api/callRecordings');
+
 const app = express();
-const callRecordingsApi = require('./api/callRecordings');
+const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
-app.use('/api', callRecordingsApi);
 
-const PORT = process.env.PORT || 3000;
+// Use the call recordings API
+app.use('/', callRecordingsRouter);
+
 app.listen(PORT, () => {
-    console.log(`Server is running on port ${PORT}`);
+    console.log(`Server running on port ${PORT}`);
 });
