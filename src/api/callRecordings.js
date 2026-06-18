@@ -4,36 +4,37 @@ const jwt = require('jsonwebtoken');
 
 const router = express.Router();
 
-// Middleware for token-based authentication
-router.use((req, res, next) => {
-    const token = req.headers['x-access-token'];
-    if (!token) return res.status(403).send({ auth: false, message: 'No token provided.' });
-    jwt.verify(token, 'SECRET_KEY', (err, decoded) => {
-        if (err) return res.status(500).send({ auth: false, message: 'Failed to authenticate.' });
-        req.userId = decoded.id;
+// Middleware to check token
+function authenticateToken(req, res, next) {
+    const token = req.headers['authorization'] && req.headers['authorization'].split(' ')[1];
+    if (!token) return res.sendStatus(401);
+    jwt.verify(token, process.env.TOKEN_SECRET, (err) => {
+        if (err) return res.sendStatus(403);
         next();
     });
-});
+}
 
-// API endpoint to fetch all call recordings
-router.get('/call-recordings', async (req, res) => {
+// Fetch call recordings
+router.get('/callRecordings', authenticateToken, async (req, res) => {
     try {
-        const response = await axios.get('https://externalapi.com/call-recordings');
-        const callRecordings = response.data;
+        const recordingsResponse = await axios.get('https://externalapi.com/call-recordings'); // Replace with the actual endpoint
+        const fundingResponse = await axios.get('https://externalapi.com/funding-info'); // Replace with the actual endpoint
 
-        // Fetching funding info for each recording
-        const fundingPromises = callRecordings.map(async (recording) => {
-            const fundingResponse = await axios.get(`https://externalapi.com/funding/${recording.fundingId}`);
+        const recordings = recordingsResponse.data;
+        const fundingInfo = fundingResponse.data;
+
+        // Assuming both recordings and fundingInfo have an id property to match them
+        const response = recordings.map(recording => {
             return {
                 ...recording,
-                fundingInfo: fundingResponse.data
+                funding: fundingInfo.find(fund => fund.recordingId === recording.id)
             };
         });
 
-        const recordingsWithFunding = await Promise.all(fundingPromises);
-        res.status(200).json(recordingsWithFunding);
+        res.json({ recordings: response });
     } catch (error) {
-        res.status(500).send('Error fetching call recordings.');
+        console.error(error);
+        res.status(500).send('Server error');
     }
 });
 
