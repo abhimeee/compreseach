@@ -1,40 +1,38 @@
 const express = require('express');
 const axios = require('axios');
 const jwt = require('jsonwebtoken');
-
 const router = express.Router();
 
 // Middleware for token verification
-const authenticateToken = (req, res, next) => {
-    const token = req.headers['authorization'] && req.headers['authorization'].split(' ')[1];
-    if (!token) return res.sendStatus(401);
-    jwt.verify(token, process.env.TOKEN_SECRET, (err, user) => {
-        if (err) return res.sendStatus(403);
+router.use((req, res, next) => {
+    const token = req.headers['authorization']?.split(' ')[1];
+    if (!token) return res.status(401).send('Access Denied');
+    jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
+        if (err) return res.status(403).send('Invalid Token');
         req.user = user;
         next();
     });
-};
+});
 
-// API Endpoint to fetch call recordings and funding info
-router.get('/call-recordings', authenticateToken, async (req, res) => {
+// Endpoint to fetch call recordings
+router.get('/call-recordings', async (req, res) => {
     try {
-        // Fetch Call Recordings
-        const recordingsResponse = await axios.get('https://external-api.com/call-recordings');
-        const recordings = recordingsResponse.data;
-
-        // Fetch Funding Info related to each recording
-        const fundedRecordings = await Promise.all(recordings.map(async (recording) => {
-            const fundingResponse = await axios.get(`https://external-api.com/funding/${recording.fundingId}`);
-            return {
-                ...recording,
-                fundingInfo: fundingResponse.data,
-            };
+        const response = await axios.get('https://externalapi.com/call-recordings');
+        const callRecordings = response.data.map(record => ({
+            id: record.id,
+            title: record.title,
+            date: record.date
         }));
 
-        res.status(200).json(fundedRecordings);
+        const fundingInfoResponses = await Promise.all(callRecordings.map(record => 
+            axios.get(`https://externalapi.com/funding-info/${record.id}`)
+        ));
+
+        const fundingInfo = fundingInfoResponses.map(response => response.data);
+
+        res.json({ callRecordings, fundingInfo });
     } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: 'Error fetching data' });
+        res.status(500).send('Error fetching data');
     }
 });
 
