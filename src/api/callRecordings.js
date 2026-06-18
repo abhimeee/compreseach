@@ -7,14 +7,10 @@ const router = express.Router();
 // Middleware for token-based authentication
 router.use((req, res, next) => {
     const token = req.headers['authorization'];
-    if (!token) {
-        return res.status(403).send('Forbidden');
-    }
-    jwt.verify(token, 'your_secret_key', (err, user) => {
-        if (err) {
-            return res.status(403).send('Forbidden');
-        }
-        req.user = user;
+    if (!token) return res.status(403).send('Access denied. No token provided.');
+    jwt.verify(token, process.env.JWT_SECRET, (err, decoded) => {
+        if (err) return res.status(403).send('Invalid token.');
+        req.user = decoded;
         next();
     });
 });
@@ -22,25 +18,20 @@ router.use((req, res, next) => {
 // Endpoint to fetch call recordings and funding info
 router.get('/call-recordings', async (req, res) => {
     try {
-        const response = await axios.get('https://externalapi.example.com/call-recordings');
-        const recordings = response.data.recordings;
+        const response = await axios.get('https://external-api.example.com/call-recordings');
 
-        // Assuming funding information is available under `funding`
-        const fundingResponses = await Promise.all(recordings.map(recording =>
-            axios.get(`https://externalapi.example.com/funding/${recording.id}`)
-        ));
-
-        const fundingInfo = fundingResponses.map((fundingResponse, index) => ({
-            recordingId: recordings[index].id,
-            funding: fundingResponse.data.funding
+        // Assume the response contains an array of recordings
+ing calls and their funding information
+        const recordings = response.data;
+        const result = recordings.map(recording => ({
+            callRecording: recording,
+            fundingInfo: recording.funding // Assuming funding is a field in the recording
         }));
 
-        res.json({
-            callRecordings: recordings,
-            fundingInfo: fundingInfo
-        });
+        res.status(200).json(result);
     } catch (error) {
-        res.status(500).send('Internal Server Error');
+        console.error('Error fetching call recordings:', error);
+        res.status(500).send('Error fetching data from external API.');
     }
 });
 
