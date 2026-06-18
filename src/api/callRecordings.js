@@ -5,33 +5,35 @@ const jwt = require('jsonwebtoken');
 const router = express.Router();
 
 // Middleware for token-based authentication
-router.use((req, res, next) => {
-    const token = req.headers['authorization'];
-    if (!token) return res.status(403).send('Access denied. No token provided.');
-    jwt.verify(token, process.env.JWT_SECRET, (err, decoded) => {
-        if (err) return res.status(403).send('Invalid token.');
-        req.user = decoded;
+const authenticateToken = (req, res, next) => {
+    const token = req.headers['authorization'] && req.headers['authorization'].split(' ')[1];
+    if (!token) return res.sendStatus(401);
+
+    jwt.verify(token, process.env.TOKEN_SECRET, (err, user) => {
+        if (err) return res.sendStatus(403);
+        req.user = user;
         next();
     });
-});
+};
 
 // Endpoint to fetch call recordings and funding info
-router.get('/call-recordings', async (req, res) => {
+router.get('/call-recordings', authenticateToken, async (req, res) => {
     try {
-        const response = await axios.get('https://external-api.example.com/call-recordings');
+        const response = await axios.get('https://externalapi.com/call-recordings'); // Replace with actual API endpoint
+        const callRecordings = response.data;
 
-        // Assume the response contains an array of recordings
-ing calls and their funding information
-        const recordings = response.data;
-        const result = recordings.map(recording => ({
-            callRecording: recording,
-            fundingInfo: recording.funding // Assuming funding is a field in the recording
-        }));
+        // Fetch funding information for each call recording
+        const fundingPromises = callRecordings.map(async (recording) => {
+            const fundingResponse = await axios.get(`https://externalapi.com/funding/${recording.id}`); // Replace with actual funding API endpoint
+            return { recording, fundingInfo: fundingResponse.data };
+        });
 
-        res.status(200).json(result);
+        const results = await Promise.all(fundingPromises);
+        res.status(200).json(results);
+
     } catch (error) {
-        console.error('Error fetching call recordings:', error);
-        res.status(500).send('Error fetching data from external API.');
+        console.error(error);
+        res.status(500).send('Internal Server Error');
     }
 });
 
