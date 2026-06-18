@@ -2,41 +2,46 @@ const express = require('express');
 const axios = require('axios');
 const jwt = require('jsonwebtoken');
 
-const router = express.Router();
+const app = express();
+const PORT = process.env.PORT || 3000;
 
 // Middleware for token-based authentication
-const authenticateToken = (req, res, next) => {
+app.use((req, res, next) => {
     const token = req.headers['authorization'] && req.headers['authorization'].split(' ')[1];
-    if (!token) return res.sendStatus(401);
+    if (!token) return res.sendStatus(403);
 
-    jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (err, user) => {
+    jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
         if (err) return res.sendStatus(403);
         req.user = user;
         next();
     });
-};
+});
 
-// Fetch Call Recordings
-router.get('/call-recordings', authenticateToken, async (req, res) => {
+// Fetch call recordings
+app.get('/api/call-recordings', async (req, res) => {
     try {
-        const response = await axios.get('https://externalapi.com/callRecordings');
-        const callRecordings = response.data;
+        const response = await axios.get('https://external-api.com/call_recordings');
+        const recordings = response.data;
 
-        // Simulating fetching funding info for each call recording
-        const fundingPromises = callRecordings.map(async (recording) => {
-            const fundingResponse = await axios.get(`https://externalapi.com/funding/${recording.id}`);
-            return {
-                recording,
-                funding: fundingResponse.data,
-            };
-        });
+        // Example processing logic for fetching funding information
+        const fundingPromises = recordings.map(recording =>
+            axios.get(`https://external-api.com/funding/${recording.id}`)
+        );
 
-        const results = await Promise.all(fundingPromises);
-        return res.json(results);
+        const fundingData = await Promise.all(fundingPromises);
+
+        const formattedResponse = recordings.map((recording, index) => ({
+            recording,
+            funding: fundingData[index].data,
+        }));
+
+        res.json(formattedResponse);
     } catch (error) {
-        console.error('Error fetching data:', error);
-        return res.status(500).send('Internal Server Error');
+        console.error('Error fetching call recordings:', error);
+        res.status(500).send('Internal Server Error');
     }
 });
 
-module.exports = router;
+app.listen(PORT, () => {
+    console.log(`Server is running on port ${PORT}`);
+});
