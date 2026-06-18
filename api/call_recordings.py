@@ -3,40 +3,35 @@ import requests
 
 app = Flask(__name__)
 
-# Mock external API details
-EXTERNAL_API_URL = 'https://external.api/call_recordings'
-
-# Token-based authentication (example: using a header)
+# Token-based authentication (using a simple placeholder for this example)
 @app.before_request
 def authenticate():
     token = request.headers.get('Authorization')
-    if not token or token != 'Bearer your_secure_token':  # Replace with actual token logic
+    if not token or token != 'Bearer YOUR_ACCESS_TOKEN':
         return jsonify({'message': 'Unauthorized'}), 401
 
-@app.route('/api/call_recordings', methods=['GET'])
-def fetch_call_recordings():
-    try:
-        response = requests.get(EXTERNAL_API_URL)
-        response.raise_for_status()  # Raise an error for bad responses
-        data = response.json()
+@app.route('/call_recordings', methods=['GET'])
+def get_call_recordings():
+    # Fetch call recordings from the external API
+    response = requests.get('https://externalapi.com/call_recordings')
+    if response.status_code != 200:
+        return jsonify({'message': 'Failed to fetch data'}), 500
 
-        # Process the data
-        call_recordings = data.get('recordings', [])
-        funding_info = data.get('funding_info', [])
+    recordings = response.json()
+    funding_info = []
 
-        # Structuring the response
-        result = []
-        for recording in call_recordings:
-            recording_id = recording.get('id')
-            corresponding_funding = [fund for fund in funding_info if fund['recording_id'] == recording_id]
-            result.append({
-                'recording': recording,
-                'funding_info': corresponding_funding
-            })
+    # Fetch funding info for each call recording
+    for recording in recordings:
+        funding_response = requests.get(f'https://externalapi.com/funding/{recording['id']}')
+        if funding_response.status_code == 200:
+            funding_info.append(funding_response.json())
+        else:
+            funding_info.append({'id': recording['id'], 'funding': None})  # Default funding info if fetch fails
 
-        return jsonify(result), 200
-    except requests.exceptions.RequestException as e:
-        return jsonify({'message': str(e)}), 500
+    return jsonify({
+        'recordings': recordings,
+        'funding': funding_info
+    })
 
 if __name__ == '__main__':
     app.run(debug=True)

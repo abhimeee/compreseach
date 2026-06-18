@@ -1,10 +1,8 @@
 {
   "name": "call-recordings-api",
   "version": "1.0.0",
-  "main": "index.js",
-  "scripts": {
-    "start": "node index.js"
-  },
+  "description": "API for fetching call recordings and funding information",
+  "main": "api/call_recordings.js",
   "dependencies": {
     "axios": "^0.21.1",
     "express": "^4.17.1",

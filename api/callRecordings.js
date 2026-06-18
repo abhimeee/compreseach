@@ -1,32 +1,49 @@
 const express = require('express');
 const axios = require('axios');
+const jwt = require('jsonwebtoken');
 
 const app = express();
-const EXTERNAL_API_URL = 'https://external-api.com/call-recordings';
+const PORT = 3000;
 
-// Middleware to check token-based authentication
+// Middleware for token-based authentication
 app.use((req, res, next) => {
-    const token = req.headers['authorization'];
-    if (!token || !isValidToken(token)) { // Assuming isValidToken checks the token validity
-        return res.status(401).json({ message: 'Unauthorized' });
+    const token = req.headers['authorization']?.split(' ')[1];
+    if (!token) {
+        return res.status(403).json({ message: 'No token provided.' });
     }
-    next();
+    jwt.verify(token, 'YOUR_SECRET_KEY', (err, decoded) => {
+        if (err) {
+            return res.status(401).json({ message: 'Unauthorized.' });
+        }
+        req.userId = decoded.id;
+        next();
+    });
 });
 
-// Endpoint to fetch call recordings and associated funding information
-app.get('/api/call_recordings', async (req, res) => {
+// Endpoint to fetch call recordings
+app.get('/api/callRecordings', async (req, res) => {
     try {
-        const response = await axios.get(EXTERNAL_API_URL);
-        const data = response.data;
-        res.json({
-            call_recordings: data.recordings,
-            funding_info: data.funding
-        });
+        const response = await axios.get('https://externalapi.com/callRecordings');
+        const callRecordings = response.data;
+
+        // Fetch funding info separately
+        const fundingInfoPromises = callRecordings.map(recording =>
+            axios.get(`https://externalapi.com/fundingInfo/${recording.id}`)
+        );
+
+        const fundingInfos = await Promise.all(fundingInfoPromises);
+
+        const structuredResponse = callRecordings.map((recording, index) => ({
+            recording,
+            funding: fundingInfos[index].data
+        }));
+
+        res.json(structuredResponse);
     } catch (error) {
-        res.status(500).json({ message: 'Failed to fetch recordings from external source' });
+        res.status(500).json({ message: 'Error fetching data.' });
     }
 });
 
-app.listen(3000, () => {
-    console.log('Server is running on port 3000');
+app.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
 });
