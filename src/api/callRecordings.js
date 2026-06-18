@@ -1,3 +1,5 @@
+'use strict';
+
 const express = require('express');
 const axios = require('axios');
 const jwt = require('jsonwebtoken');
@@ -5,35 +7,36 @@ const jwt = require('jsonwebtoken');
 const router = express.Router();
 
 // Middleware for token-based authentication
-const authenticateToken = (req, res, next) => {
+function authenticateToken(req, res, next) {
     const token = req.headers['authorization'] && req.headers['authorization'].split(' ')[1];
     if (!token) return res.sendStatus(401);
 
-    jwt.verify(token, process.env.TOKEN_SECRET, (err, user) => {
+    jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (err) => {
         if (err) return res.sendStatus(403);
-        req.user = user;
         next();
     });
-};
+}
 
-// Endpoint to fetch call recordings and funding info
+// Fetch call recordings and funding information
 router.get('/call-recordings', authenticateToken, async (req, res) => {
     try {
-        const response = await axios.get('https://externalapi.com/call-recordings'); // Replace with actual API endpoint
+        // Replace with the actual API URL for call recordings
+        const response = await axios.get('https://externalapi.com/call-recordings');
         const callRecordings = response.data;
 
         // Fetch funding information for each call recording
         const fundingPromises = callRecordings.map(async (recording) => {
-            const fundingResponse = await axios.get(`https://externalapi.com/funding/${recording.id}`); // Replace with actual funding API endpoint
-            return { recording, fundingInfo: fundingResponse.data };
+            const fundingResponse = await axios.get(`https://externalapi.com/funding/${recording.id}`);
+            return { recording, funding: fundingResponse.data };
         });
 
         const results = await Promise.all(fundingPromises);
-        res.status(200).json(results);
 
+        // Structure the response
+        res.json(results);
     } catch (error) {
         console.error(error);
-        res.status(500).send('Internal Server Error');
+        res.sendStatus(500);
     }
 });
 
