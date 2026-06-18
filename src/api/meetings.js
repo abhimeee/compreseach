@@ -1,38 +1,42 @@
 const express = require('express');
 const router = express.Router();
-const { getMeetingTranscripts, getFundingInfo } = require('../services/meetingService');
+const db = require('../db'); // Assume we have a database module to handle queries
 
 /**
- * @route GET /api/meeting-transcripts
+ * @route GET /api/meetings/transcripts
  * @desc Retrieve meeting transcripts and funding information
- * @returns {Object} transcripts and funding information
+ * @access Public
  */
-router.get('/meeting-transcripts', async (req, res) => {
+router.get('/transcripts', async (req, res) => {
     try {
         // Get meeting transcripts
-        const transcripts = await getMeetingTranscripts();
+        const meetingTranscripts = await db.query('SELECT * FROM meeting_transcripts');
 
-        // Extract unique company names from the transcripts
-        const companies = new Set(transcripts.map(t => t.company));
-
-        // Get funding info for each company
-        const fundingPromises = Array.from(companies).map(company => getFundingInfo(company));
-        const fundingInfo = await Promise.all(fundingPromises);
-
-        // Construct response payload
-        const response = transcripts.map(transcript => {
-            const fundingDetails = fundingInfo.find(info => info.company === transcript.company) || {};
-            return {
-                ...transcript,
-                fundingRound: fundingDetails.latestRound,
-                totalFunding: fundingDetails.totalAmount
-            };
+        // Extract company mentions from transcripts
+        const companies = new Set();
+        meetingTranscripts.forEach(transcript => {
+            const mentions = transcript.text.match(/\b[A-Z][a-zA-Z]*\b/g);
+            if (mentions) {
+                mentions.forEach(company => companies.add(company));
+            }
         });
 
-        res.json(response);
+        // Fetch funding information for mentioned companies
+        const fundingInfo = await Promise.all([...companies].map(async company => {
+            const fundingData = await db.query('SELECT * FROM funding WHERE company = ?', [company]);
+            const latestFunding = fundingData.sort((a, b) => new Date(b.date) - new Date(a.date))[0]; // Get latest round
+            return {
+                company,
+                totalFunding: fundingData.reduce((sum, round) => sum + round.amount, 0),
+                latestRound: latestFunding ? latestFunding.round : null,
+                latestAmount: latestFunding ? latestFunding.amount : null
+            };
+        }));
+
+        return res.status(200).json({ meetingTranscripts, fundingInfo });
     } catch (error) {
-        console.error('Error retrieving meeting transcripts:', error);
-        res.status(500).json({ message: 'Internal Server Error' });
+        console.error(error);
+        return res.status(500).json({ message: 'Internal Server Error' });
     }
 });
 
