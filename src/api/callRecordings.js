@@ -1,48 +1,45 @@
 const express = require('express');
-const jwt = require('jsonwebtoken');
 const axios = require('axios');
+const jwt = require('jsonwebtoken');
 
-const app = express();
-app.use(express.json());
+const router = express.Router();
 
-// Token-based authentication middleware
+// Middleware for token-based authentication  
 const authenticateToken = (req, res, next) => {
-    const token = req.header('Authorization')?.split(' ')[1];
+    const token = req.headers['authorization'] && req.headers['authorization'].split(' ')[1];
     if (!token) return res.sendStatus(401);
 
-    jwt.verify(token, 'your_jwt_secret', (err, user) => {
+    jwt.verify(token, process.env.TOKEN_SECRET, (err, user) => {
         if (err) return res.sendStatus(403);
         req.user = user;
         next();
     });
 };
 
-// Fetch call recordings
-app.get('/api/callRecordings', authenticateToken, async (req, res) => {
+// Fetch call recordings and funding information  
+router.get('/call-recordings', authenticateToken, async (req, res) => {
     try {
-        const response = await axios.get('https://external-api.com/callRecordings');
+        const response = await axios.get('https://externalapi.com/callRecordings');
         const callRecordings = response.data;
 
-        // Fetch associated funding information
-        const fundingPromises = callRecordings.map(recording => {
-            return axios.get(`https://external-api.com/funding/${recording.id}`);
-        });
+        // Assuming that funding info can be fetched from another endpoint  
+        const fundingResponses = await Promise.all(callRecordings.map(recording => 
+            axios.get(`https://externalapi.com/fundingInfo/${recording.id}`)
+        ));
 
-        const fundingInfos = await Promise.all(fundingPromises);
+        const fundingInfo = fundingResponses.map(resp => resp.data);
 
-        // Structure response
+        // Structure the response  
         const structuredResponse = callRecordings.map((recording, index) => ({
-            callRecording: recording,
-            fundingInfo: fundingInfos[index].data,
+            recording,
+            funding: fundingInfo[index],
         }));
 
         res.json(structuredResponse);
     } catch (error) {
-        res.status(500).json({ error: 'Failed to fetch data from external API' });
+        console.error(error);
+        res.sendStatus(500);
     }
 });
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
-});
+module.exports = router;
