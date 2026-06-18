@@ -3,40 +3,37 @@ import requests
 
 app = Flask(__name__)
 
-# Mock external API endpoint
-EXTERNAL_API_URL = 'https://externalapi.com/call_recordings'
+# Sample external API URL
+EXTERNAL_API_URL = 'https://external-api.com/call_recordings'
 
-# Token-based authentication decorator
-def token_required(f):
-    def decorator(*args, **kwargs):
-        token = request.headers.get('Authorization')
-        if not token:
-            return jsonify({'message': 'Token is missing!'}), 403
-        # Ideally, you would validate the token here
-        return f(*args, **kwargs)
-    return decorator
+# Middleware for token-based authentication
+@app.before_request
+def token_required():
+    token = request.headers.get('Authorization')
+    if not token:
+        return jsonify({'message': 'Token is missing!'}), 403
+    # Implement token validation logic here
 
+# Endpoint to fetch call recordings and funding info
 @app.route('/api/call_recordings', methods=['GET'])
-@token_required
 def fetch_call_recordings():
-    try:
-        response = requests.get(EXTERNAL_API_URL)
-        response.raise_for_status()
-        recordings_data = response.json()
-        call_recordings = recordings_data['call_recordings']
-        funding_info = recordings_data['funding_info']
+    response = requests.get(EXTERNAL_API_URL)
+    if response.status_code != 200:
+        return jsonify({'message': 'Failed to fetch data from external API.'}), 500
 
-        # Structuring the response
-        structured_response = {
-            'call_recordings': call_recordings,
-            'funding_info': funding_info
+    data = response.json()
+    formatted_response = []
+
+    for item in data['call_recordings']:
+        call_record = {
+            'id': item['id'],
+            'title': item['title'],
+            'date': item['date'],
         }
+        funding_info = item['funding']
+        formatted_response.append({'call_recording': call_record, 'funding_info': funding_info})
 
-        return jsonify(structured_response), 200
-    except requests.exceptions.HTTPError as http_err:
-        return jsonify({'error': str(http_err)}), 500
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
+    return jsonify(formatted_response), 200
 
 if __name__ == '__main__':
     app.run(debug=True)
