@@ -1,12 +1,17 @@
 const express = require('express');
-const callRecordingsRouter = require('./apis/callRecordings');
+const bodyParser = require('body-parser');
+const callRecordingsRouter = require('./api/callRecordings');
+
+dotenv = require('dotenv');
+dotenv.config();
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+app.use(bodyParser.json());
 
-app.use(express.json());
+// Use call recordings API
 app.use('/api', callRecordingsRouter);
 
+const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);
 });
