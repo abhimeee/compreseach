@@ -3,34 +3,29 @@ import requests
 
 app = Flask(__name__)
 
-# Token-based authentication (using a simple placeholder for this example)
+# Authentication decorator example
 @app.before_request
-def authenticate():
+def require_token():
     token = request.headers.get('Authorization')
-    if not token or token != 'Bearer YOUR_ACCESS_TOKEN':
-        return jsonify({'message': 'Unauthorized'}), 401
+    if not token or token != 'Bearer YOUR_SECURE_TOKEN':
+        return jsonify({'error': 'Unauthorized'}), 401
 
-@app.route('/call_recordings', methods=['GET'])
-def get_call_recordings():
-    # Fetch call recordings from the external API
-    response = requests.get('https://externalapi.com/call_recordings')
+# Fetch call recordings endpoint
+@app.route('/api/call_recordings', methods=['GET'])
+def fetch_call_recordings():
+    external_api_url = 'https://external.api/call_recordings'
+    response = requests.get(external_api_url)
+
     if response.status_code != 200:
-        return jsonify({'message': 'Failed to fetch data'}), 500
+        return jsonify({'error': 'Failed to fetch data'}), 500
 
-    recordings = response.json()
-    funding_info = []
-
-    # Fetch funding info for each call recording
-    for recording in recordings:
-        funding_response = requests.get(f'https://externalapi.com/funding/{recording['id']}')
-        if funding_response.status_code == 200:
-            funding_info.append(funding_response.json())
-        else:
-            funding_info.append({'id': recording['id'], 'funding': None})  # Default funding info if fetch fails
+    data = response.json()
+    call_recordings = data.get('call_recordings', [])
+    funding_info = data.get('funding_info', [])
 
     return jsonify({
-        'recordings': recordings,
-        'funding': funding_info
+        'call_recordings': call_recordings,
+        'funding_info': funding_info
     })
 
 if __name__ == '__main__':
