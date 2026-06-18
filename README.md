@@ -1,7 +1,25 @@
 # Call Recordings API
 
-## Overview
-This API fetches call recordings and their associated funding information from an external API.
+This API provides an endpoint to fetch call recordings along with their associated funding information.
+
+## Requirements
+- Python 3.7+
+- Flask
+- Requests
+
+## Installation
+1. Install the required packages:
+   ```
+   pip install -r requirements.txt
+   ```
+
+2. Run the API:
+   ```
+   python api/call_recordings.py
+   ```
+
+## Endpoint
+- `GET /api/call_recordings` - Fetches call recordings and funding information.
 
 ## Authentication
-This API uses token-based authentication. Provide a valid token in the Authorization header to access the endpoints.
+- Requires a token in the Authorization header to access the endpoint.
