@@ -1,38 +1,34 @@
-from flask import Blueprint, request, jsonify
+from flask import Flask, jsonify, request
 import requests
 
-call_recordings_bp = Blueprint('call_recordings', __name__)
+app = Flask(__name__)
 
-@call_recordings_bp.route('/api/call_recordings', methods=['GET'])
+# External API URL
+EXTERNAL_API_URL = 'https://external-api.com/call-recordings'
+
+# Middleware to check token-based authentication
+@app.before_request
+def check_authentication():
+    token = request.headers.get('Authorization')
+    if not token or not is_valid_token(token):  # Assuming is_valid_token checks the token's validity
+        return jsonify({'message': 'Unauthorized'}), 401
+
+# Endpoint to fetch call recordings and associated funding information
+@app.route('/api/call_recordings', methods=['GET'])
 def get_call_recordings():
-    # Get the auth token from headers
-    auth_token = request.headers.get('Authorization')
-    if not auth_token:
-        return jsonify({'error': 'Authorization token is missing'}), 401
-    
     # Fetch call recordings from external API
-    try:
-        headers = {'Authorization': auth_token}
-        response = requests.get('https://externalapi.com/call_recordings', headers=headers)
-        response.raise_for_status()
-        recordings_data = response.json()
-    except requests.RequestException as e:
-        return jsonify({'error': str(e)}), 500
+    response = requests.get(EXTERNAL_API_URL)
+    if response.status_code != 200:
+        return jsonify({'message': 'Failed to fetch recordings from external source'}), 500
 
-    # Now fetch funding information
-    funding_info = []
-    for recording in recordings_data:
-        try:
-            recording_id = recording['id']
-            funding_response = requests.get(f'https://externalapi.com/funding_info/{recording_id}', headers=headers)
-            funding_response.raise_for_status()
-            funding_info.append(funding_response.json())
-        except requests.RequestException:
-            funding_info.append({'id': recording_id, 'error': 'Funding info could not be fetched'})
+    data = response.json()
+    recordings = data.get('recordings', [])
+    funding_info = data.get('funding', [])
 
-    # Structure the response
-    response_data = {
-        'call_recordings': recordings_data,
+    return jsonify({
+        'call_recordings': recordings,
         'funding_info': funding_info
-    }
-    return jsonify(response_data), 200
+    })
+
+if __name__ == '__main__':
+    app.run(debug=True)
