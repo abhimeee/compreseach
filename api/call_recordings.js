@@ -1,44 +1,40 @@
 const express = require('express');
 const axios = require('axios');
-const jwt = require('jsonwebtoken'); // Assuming JWT for token-based authentication
+const jwt = require('jsonwebtoken');
 
-const router = express.Router();
+const app = express();
+const PORT = process.env.PORT || 3000;
 
 // Middleware for token-based authentication
-router.use((req, res, next) => {
-    const token = req.headers['authorization']?.split(' ')[1]; // Bearer token
-    if (!token) {
-        return res.status(401).json({ error: 'No token provided' });
-    }
-    jwt.verify(token, process.env.JWT_SECRET, (err, decoded) => {
-        if (err) {
-            return res.status(403).json({ error: 'Failed to authenticate token' });
-        }
-        req.userId = decoded.id; // Store user id from token
+app.use((req, res, next) => {
+    const token = req.headers['authorization']?.split(' ')[1];
+    if (!token) return res.status(401).send('Access Denied');
+    jwt.verify(token, process.env.JWT_SECRET, (err) => {
+        if (err) return res.status(403).send('Invalid Token');
         next();
     });
 });
 
-// Endpoint to fetch call recordings and funding info
-router.get('/call-recordings', async (req, res) => {
+// Fetch call recordings
+app.get('/api/call-recordings', async (req, res) => {
     try {
-        const response = await axios.get('https://externalapi.com/call_recordings'); // Replace with actual external API
+        const response = await axios.get('https://external-api.com/call_recordings');
         const callRecordings = response.data;
-        const fundingResponses = await Promise.all(callRecordings.map(async (recording) => {
-            const fundingResponse = await axios.get(`https://externalapi.com/funding/${recording.id}`);
-            return fundingResponse.data;
-        }));
 
-        const structuredResponse = callRecordings.map((recording, index) => ({
-            recording,
-            fundingInfo: fundingResponses[index]
-        }));
+        // Fetch funding info for each call recording
+        const fundingInfoPromises = callRecordings.map(async (recording) => {
+            const fundingResponse = await axios.get(`https://external-api.com/funding/${recording.id}`);
+            return { recording, funding: fundingResponse.data };
+        });
 
-        return res.json(structuredResponse);
+        const result = await Promise.all(fundingInfoPromises);
+        res.json(result);
     } catch (error) {
         console.error(error);
-        return res.status(500).json({ error: 'Failed to fetch call recordings or funding info' });
+        res.status(500).send('Internal Server Error');
     }
 });
 
-module.exports = router;
+app.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+});
