@@ -3,32 +3,39 @@ import requests
 
 app = Flask(__name__)
 
-# Dummy token for authentication
-API_TOKEN = 'your_api_token'
-EXTERNAL_API_URL = 'https://external-api.com/call_recordings'
+# Mock external API endpoint
+EXTERNAL_API_URL = 'https://externalapi.com/call_recordings'
 
-@app.route('/api/call-recordings', methods=['GET'])
+# Token-based authentication
+AUTHENTICATION_TOKEN = 'your_token_here'  # Replace with secure token retrieval mechanism
+
+@app.route('/api/call_recordings', methods=['GET'])
 def fetch_call_recordings():
-    # Check for token in headers
     token = request.headers.get('Authorization')
-    if not token or token != f'Token {API_TOKEN}':
+    if token != f'Bearer {AUTHENTICATION_TOKEN}':
         return jsonify({'error': 'Unauthorized'}), 401
 
-    # Fetch call recordings from external API
     response = requests.get(EXTERNAL_API_URL)
     if response.status_code != 200:
-        return jsonify({'error': 'Failed to fetch data from external API'}), 500
+        return jsonify({'error': 'Failed to fetch data'}), 500
 
-    # Parse the response
     data = response.json()
-    call_recordings = []
-    funding_info = []
+    call_recordings = data.get('call_recordings', [])
+    funding_info = data.get('funding_info', [])
 
-    for item in data:
-        call_recordings.append(item['recording'])
-        funding_info.append(item['funding'])
+    results = []
+    for recording in call_recordings:
+        recording_response = {
+            'recording_id': recording['id'],
+            'recording_url': recording['url'],
+            'funding': []
+        }
+        for funding in funding_info:
+            if funding['recording_id'] == recording['id']:
+                recording_response['funding'].append(funding)
+        results.append(recording_response)
 
-    return jsonify({'call_recordings': call_recordings, 'funding_info': funding_info})
+    return jsonify(results)
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(port=5000)
