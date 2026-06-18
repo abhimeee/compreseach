@@ -3,39 +3,35 @@ import requests
 
 app = Flask(__name__)
 
-# Mock external API endpoint
-EXTERNAL_API_URL = 'https://externalapi.com/call_recordings'
+# Mock external API credentials
+EXTERNAL_API_URL = 'https://external-api.example.com/call_recordings'
 
-# Token-based authentication
-AUTHENTICATION_TOKEN = 'your_token_here'  # Replace with secure token retrieval mechanism
+# Token-based Authentication Middleware
+@app.before_request
+def check_auth_token():
+    token = request.headers.get('Authorization')
+    if not token or not validate_token(token):
+        return jsonify({'error': 'Unauthorized access'}), 401
+
+# Mock token validation function
+def validate_token(token):
+    # Here would be the logic to validate the token
+    return True  # For simplicity, we assume all tokens are valid in this example
 
 @app.route('/api/call_recordings', methods=['GET'])
 def fetch_call_recordings():
-    token = request.headers.get('Authorization')
-    if token != f'Bearer {AUTHENTICATION_TOKEN}':
-        return jsonify({'error': 'Unauthorized'}), 401
-
     response = requests.get(EXTERNAL_API_URL)
     if response.status_code != 200:
-        return jsonify({'error': 'Failed to fetch data'}), 500
-
-    data = response.json()
-    call_recordings = data.get('call_recordings', [])
-    funding_info = data.get('funding_info', [])
-
-    results = []
-    for recording in call_recordings:
-        recording_response = {
-            'recording_id': recording['id'],
-            'recording_url': recording['url'],
-            'funding': []
-        }
-        for funding in funding_info:
-            if funding['recording_id'] == recording['id']:
-                recording_response['funding'].append(funding)
-        results.append(recording_response)
-
-    return jsonify(results)
+        return jsonify({'error': 'Failed to fetch recordings'}), response.status_code
+    # Assume response data includes a list of recordings with funding info
+    recordings = response.json() 
+    # Process data as needed to separate call recordings and funding info
+    call_recordings = []
+    funding_info = []
+    for item in recordings:
+        call_recordings.append({'id': item['id'], 'name': item['name']})
+        funding_info.append({'recording_id': item['id'], 'funding_amount': item['funding_amount']})
+    return jsonify({'call_recordings': call_recordings, 'funding_info': funding_info})
 
 if __name__ == '__main__':
-    app.run(port=5000)
+    app.run(debug=True)
