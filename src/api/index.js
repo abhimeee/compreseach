@@ -1,5 +1,5 @@
 const express = require('express');
-const callRecordingsRouter = require('./api/callRecordings');
+const callRecordingsRouter = require('./callRecordings');
 
 const app = express();
 const PORT = process.env.PORT || 3000;

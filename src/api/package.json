@@ -1,0 +1,1 @@
+{ "name": "call-recording-api", "version": "1.0.0", "main": "index.js", "scripts": { "start": "node index.js" }, "dependencies": { "axios": "0.24.0", "express": "4.17.1", "jsonwebtoken": "8.5.1" } }

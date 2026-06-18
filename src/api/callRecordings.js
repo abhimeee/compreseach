@@ -5,38 +5,32 @@ const jwt = require('jsonwebtoken');
 const router = express.Router();
 
 // Middleware for token-based authentication
-function authenticateToken(req, res, next) {
+const authenticateToken = (req, res, next) => {
     const token = req.headers['authorization'] && req.headers['authorization'].split(' ')[1];
-    if (!token) return res.sendStatus(403); // Forbidden
-    jwt.verify(token, process.env.TOKEN_SECRET, (err, user) => {
-        if (err) return res.sendStatus(403); // Forbidden
-        req.user = user;
+    if (!token) return res.sendStatus(401);
+    jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (err) => {
+        if (err) return res.sendStatus(403);
         next();
     });
-}
+};
 
 // Endpoint to fetch call recordings and funding info
 router.get('/call-recordings', authenticateToken, async (req, res) => {
     try {
-        const recordingsResponse = await axios.get('https://external-api.com/call-recordings');
-        const fundingResponse = await axios.get('https://external-api.com/funding-info');
+        const recordingsResponse = await axios.get('https://external-api.com/callRecordings');
+        const fundingResponses = await Promise.all(recordingsResponse.data.map(recording => 
+            axios.get(`https://external-api.com/funding/${recording.id}`)
+        ));
 
-        const recordings = recordingsResponse.data;
-        const funding = fundingResponse.data;
-
-        // Structure the response
-        const response = recordings.map(recording => {
-            return {
-                recordingId: recording.id,
-                recordingUrl: recording.url,
-                fundingInfo: funding.find(fund => fund.recordingId === recording.id)
-            };
-        });
+        const response = recordingsResponse.data.map((recording, index) => ({
+            recording,
+            fundingInfo: fundingResponses[index].data
+        }));
 
         res.json(response);
     } catch (error) {
-        console.error(error);
-        res.sendStatus(500); // Internal Server Error
+        console.error('Error fetching data', error);
+        res.status(500).json({ message: 'Internal Server Error' });
     }
 });
 
