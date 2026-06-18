@@ -1,16 +1,13 @@
-import express from 'express';
-import callRecordingsRouter from './api/callRecordings.js';
+const express = require('express');
+const callRecordingsRouter = require('./api/callRecordings');
 
 const app = express();
-
-// Middleware to parse JSON body
-app.use(express.json());
-
-// Use the call recordings router
-app.use('/api', callRecordingsRouter);
-
 const PORT = process.env.PORT || 3000;
 
+app.use(express.json());
+// Using the call recordings API
+app.use('/api', callRecordingsRouter);
+
 app.listen(PORT, () => {
-    console.log(`Server is running on port ${PORT}.`);
+    console.log(`Server running on port ${PORT}`);
 });
