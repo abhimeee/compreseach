@@ -3,44 +3,34 @@ const axios = require('axios');
 const jwt = require('jsonwebtoken');
 
 const router = express.Router();
-const AUTH_TOKEN = 'your_auth_token'; // Replace with actual token or config
 
-// Middleware for token-based authentication
-const authenticateToken = (req, res, next) => {
-    const token = req.headers['authorization'] && req.headers['authorization'].split(' ')[1];
-    if (!token) return res.sendStatus(401);
-    jwt.verify(token, 'your_jwt_secret', (err, user) => { // replace with your secret
-        if (err) return res.sendStatus(403);
-        req.user = user;
+// Middleware for token authentication
+router.use((req, res, next) => {
+    const token = req.headers['authorization'];
+    if (!token) return res.status(403).send('Access denied. No token provided.');
+    jwt.verify(token, process.env.JWT_SECRET, (err, decoded) => {
+        if (err) return res.status(401).send('Invalid token.');
+        req.user = decoded;
         next();
     });
-};
+});
 
-// Endpoint to fetch call recordings and funding information
-router.get('/callRecordings', authenticateToken, async (req, res) => {
+// Fetch all call recordings and their funding info
+router.get('/call-recordings', async (req, res) => {
     try {
-        const recordingsResponse = await axios.get('https://externalapi.com/callRecordings', {
-            headers: { 'Authorization': `Bearer ${AUTH_TOKEN}` }
+        const response = await axios.get('https://external-api.example.com/call-recordings');
+        const callRecordings = response.data.recordings;
+
+        const fundingInfoPromises = callRecordings.map(async (recording) => {
+            const fundingResponse = await axios.get(`https://external-api.example.com/funding/${recording.id}`);
+            return { ...recording, funding: fundingResponse.data };
         });
 
-        const recordings = recordingsResponse.data;
-
-        // Fetch funding information related to each call recording
-        const fundingPromises = recordings.map(async (recording) => {
-            const fundingResponse = await axios.get(`https://externalapi.com/funding/${recording.id}`, {
-                headers: { 'Authorization': `Bearer ${AUTH_TOKEN}` }
-            });
-            return {
-                recording,
-                funding: fundingResponse.data
-            };
-        });
-
-        const results = await Promise.all(fundingPromises);
-        res.json(results);
+        const callRecordingsWithFunding = await Promise.all(fundingInfoPromises);
+        res.json({ recordings: callRecordingsWithFunding });
     } catch (error) {
         console.error(error);
-        res.status(500).send('Internal Server Error');
+        res.status(500).send('An error occurred while fetching call recordings.');
     }
 });
 
