@@ -3,33 +3,32 @@ import requests
 
 app = Flask(__name__)
 
-# Constants
-EXTERNAL_API_URL = 'https://external.api/call_recordings'
+# Dummy token for authentication
+API_TOKEN = 'your_api_token'
+EXTERNAL_API_URL = 'https://external-api.com/call_recordings'
 
-# Token-based authentication decorator
-from functools import wraps
+@app.route('/api/call-recordings', methods=['GET'])
+def fetch_call_recordings():
+    # Check for token in headers
+    token = request.headers.get('Authorization')
+    if not token or token != f'Token {API_TOKEN}':
+        return jsonify({'error': 'Unauthorized'}), 401
 
-def token_required(f):
-    @wraps(f)
-    def decorated(*args, **kwargs):
-        token = request.headers.get('Authorization')
-        if not token:
-            return jsonify({'message': 'Token is missing!'}), 403
-        # Here we would verify the token; this is a placeholder
-        return f(*args, **kwargs)
-    return decorated
-
-# Fetch call recordings
-@app.route('/api/call_recordings', methods=['GET'])
-token_required
-def get_call_recordings():
+    # Fetch call recordings from external API
     response = requests.get(EXTERNAL_API_URL)
     if response.status_code != 200:
-        return jsonify({'message': 'Failed to fetch data'}), 500
+        return jsonify({'error': 'Failed to fetch data from external API'}), 500
+
+    # Parse the response
     data = response.json()
-    recordings = data.get('recordings', [])
-    funding_info = data.get('funding_info', [])
-    return jsonify({'recordings': recordings, 'funding_info': funding_info})
+    call_recordings = []
+    funding_info = []
+
+    for item in data:
+        call_recordings.append(item['recording'])
+        funding_info.append(item['funding'])
+
+    return jsonify({'call_recordings': call_recordings, 'funding_info': funding_info})
 
 if __name__ == '__main__':
     app.run(debug=True)
