@@ -1,13 +1,13 @@
-const express = require('express');
-const axios = require('axios');
-const jwt = require('jsonwebtoken');
+import express from 'express';
+import axios from 'axios';
+import jwt from 'jsonwebtoken';
+
 const router = express.Router();
 
 // Middleware for token-based authentication
 const authenticateToken = (req, res, next) => {
-    const token = req.headers['authorization']?.split(' ')[1];
-    if (token == null) return res.sendStatus(401);
-
+    const token = req.header('x-auth-token');
+    if (!token) return res.sendStatus(403);
     jwt.verify(token, process.env.TOKEN_SECRET, (err, user) => {
         if (err) return res.sendStatus(403);
         req.user = user;
@@ -15,25 +15,31 @@ const authenticateToken = (req, res, next) => {
     });
 };
 
-// Fetch call recordings
+// Fetch call recordings and their funding information
 router.get('/call-recordings', authenticateToken, async (req, res) => {
     try {
-        const response = await axios.get('https://external.api/call-recordings');
+        const response = await axios.get('https://external-api.com/call-recordings');
         const callRecordings = response.data;
 
-        // Fetch funding information for each call recording
-        const fundingInfoPromises = callRecordings.map(async (recording) => {
-            const fundingResponse = await axios.get(`https://external.api/funding-info/${recording.id}`);
-            return { ...recording, funding: fundingResponse.data };
+        // Assuming each call recording has an associated funding id
+        let fundingInfoPromises = callRecordings.map(recording => {
+            return axios.get(`https://external-api.com/funding/${recording.fundingId}`);
         });
 
-        const recordingsWithFunding = await Promise.all(fundingInfoPromises);
+        const fundingInfos = await Promise.all(fundingInfoPromises);
 
-        res.json(recordingsWithFunding);
+        const structuredResponse = callRecordings.map((recording, index) => {
+            return {
+                callRecording: recording,
+                fundingInfo: fundingInfos[index].data
+            };
+        });
+
+        res.json(structuredResponse);
     } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: 'Error fetching recordings' });
+        console.error('Error fetching data:', error);
+        res.sendStatus(500);
     }
 });
 
-module.exports = router;
+export default router;
