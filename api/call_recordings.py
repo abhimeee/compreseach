@@ -1,42 +1,37 @@
 from flask import Flask, request, jsonify
 import requests
-from functools import wraps
 
 app = Flask(__name__)
 
-# Mock function to simulate token verification
-def verify_token(token):
-    # Placeholder for token verification logic
-    return token == 'valid_token'
-
-# Authentication decorator
-def token_required(f):
-    @wraps(f)
-    def decorated(*args, **kwargs):
-        token = request.headers.get('Authorization')
-        if not token or not verify_token(token):
-            return jsonify({'message': 'Token is missing or invalid.'}), 403
-        return f(*args, **kwargs)
-    return decorated
+# Mock external API endpoint
+EXTERNAL_API_URL = 'https://externalapi.com/call_recordings'
+TOKEN = 'your_auth_token'  # Change this to a secure way of obtaining tokens
 
 @app.route('/api/call_recordings', methods=['GET'])
-token_required 
 def get_call_recordings():
+    # Token-based authentication
+    auth_token = request.headers.get('Authorization')
+    if not auth_token or auth_token != f'Bearer {TOKEN}':
+        return jsonify({'error': 'Unauthorized'}), 401
+
+    # Fetch call recordings from external API
     try:
-        # Replace 'EXTERNAL_API_URL' and 'API_KEY' with actual values.
-        response = requests.get('EXTERNAL_API_URL/call_recordings', headers={'Authorization': 'API_KEY'})
-        call_recordings = response.json()
-        funding_info = {}
-
-        # Mock function to fetch funding info for each call recording
-        for recording in call_recordings['data']:
-            # Assuming 'id' is a key in recording
-            funding_response = requests.get(f'EXTERNAL_API_URL/funding/{recording['id']}')
-            funding_info[recording['id']] = funding_response.json()
-
-        return jsonify({'call_recordings': call_recordings['data'], 'funding_info': funding_info})
-    except Exception as e:
+        headers = {'Authorization': f'Bearer {TOKEN}'}
+        response = requests.get(EXTERNAL_API_URL, headers=headers)
+        response.raise_for_status()  # Raise error for bad responses
+        data = response.json()
+    except requests.RequestException as e:
         return jsonify({'error': str(e)}), 500
+
+    # Process the response to separate call recordings and funding info
+    call_recordings = []
+    funding_info = []
+
+    for item in data:
+        call_recordings.append(item.get('call'))
+        funding_info.append(item.get('funding'))
+
+    return jsonify({'call_recordings': call_recordings, 'funding_info': funding_info})
 
 if __name__ == '__main__':
     app.run(debug=True)
