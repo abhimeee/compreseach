@@ -1,3 +1,5 @@
+'use strict';
+
 const express = require('express');
 const axios = require('axios');
 const jwt = require('jsonwebtoken');
@@ -5,33 +7,41 @@ const jwt = require('jsonwebtoken');
 const router = express.Router();
 
 // Middleware for token-based authentication
-router.use((req, res, next) => {
+function authenticateToken(req, res, next) {
     const token = req.headers['authorization']?.split(' ')[1];
-    if (!token) return res.status(403).send('A token is required.');
-    jwt.verify(token, process.env.JWT_SECRET, (err) => {
-        if (err) return res.status(401).send('Invalid Token.');
+    if (!token) return res.sendStatus(401);
+
+    jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (err) => {
+        if (err) return res.sendStatus(403);
         next();
     });
-});
+}
 
-// Fetch call recordings and funding info
-router.get('/call-recordings', async (req, res) => {
+// Fetch Call Recordings
+router.get('/call-recordings', authenticateToken, async (req, res) => {
     try {
-        const response = await axios.get('https://external.api/callRecordings');
-        const recordings = response.data;
+        const response = await axios.get('https://external-api.com/call_recordings');
+        const callRecordings = response.data;
 
-        // Fetch funding info for each recording
-        const fundingInfoPromises = recordings.map(recording => 
-            axios.get(`https://external.api/funding/${recording.id}`)
-                .then(response => ({...recording, fundingInfo: response.data}))
-        );
+        // Assuming the funding info is part of the call recording response
+        const fundingPromises = callRecordings.map(recording => {
+            return axios.get(`https://external-api.com/funding_info/${recording.id}`);
+        });
 
-        const recordingsWithFunding = await Promise.all(fundingInfoPromises);
+        const fundingInfos = await Promise.all(fundingPromises);
 
-        res.json({ callRecordings: recordingsWithFunding });
+        // Structure response
+        const responseData = callRecordings.map((recording, index) => {
+            return {
+                recording,
+                fundingInfo: fundingInfos[index].data,
+            };
+        });
+
+        res.json(responseData);
     } catch (error) {
-        console.error(error);
-        res.status(500).send('Internal Server Error');
+        console.error('Error fetching data:', error);
+        res.sendStatus(500);
     }
 });
 

@@ -1,11 +1,13 @@
 const express = require('express');
-const bodyParser = require('body-parser');
 const callRecordingsRouter = require('./api/callRecordings');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-app.use(bodyParser.json());
+// Middleware to parse JSON requests
+app.use(express.json());
+
+// Use the call recordings API router
 app.use('/api', callRecordingsRouter);
 
 app.listen(PORT, () => {
