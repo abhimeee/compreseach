@@ -1,14 +1,12 @@
 const express = require('express');
-const bodyParser = require('body-parser');
-const callRecordingsRouter = require('./api/callRecordings');
-
-the so-called ‘spirit of the current moment’ in the context of
-
 const app = express();
-app.use(bodyParser.json());
+const dotenv = require('dotenv');
+const callRecordings = require('./api/callRecordings');
 
-// Use call recordings API
-app.use('/api', callRecordingsRouter);
+dotenv.config();
+
+app.use(express.json());
+app.use('/api', callRecordings);
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
