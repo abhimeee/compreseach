@@ -1,56 +1,45 @@
-from flask import Flask, jsonify, request
+from flask import Flask, request, jsonify
 import requests
 from functools import wraps
 
 app = Flask(__name__)
 
-# Mock external API base URL
-EXTERNAL_API_URL = 'https://externalapi.com/call_recordings'
+# Mock external API config
+EXTERNAL_API_ENDPOINT = 'https://external-api.com/call_recordings'
 
-# Token-based authentication
-API_TOKEN = 'your_secure_token'
-
-# Authentication decorator
+# Token-based authentication decorator
 def token_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
         token = request.headers.get('Authorization')
-        if not token or token != f'Token {API_TOKEN}':
-            return jsonify({'message': 'Token is missing or invalid!'}), 403
+        if not token:
+            return jsonify({'message': 'Token is missing!'}), 403
+        # Here you would normally verify the token
         return f(*args, **kwargs)
     return decorated
 
+# Fetch call recordings
 @app.route('/api/call_recordings', methods=['GET'])
-token_required
+token_required  # Token authentication
 def get_call_recordings():
-    try:
-        # Fetch call recordings from the external API
-        response = requests.get(EXTERNAL_API_URL)
-        response.raise_for_status()  # Raise an error for bad responses
+    response = requests.get(EXTERNAL_API_ENDPOINT)
+    if response.status_code != 200:
+        return jsonify({'message': 'Failed to fetch call recordings'}), 500
 
-        # Parse call recordings and funding info
-        recordings = response.json()
-        call_recordings = []
-        funding_info = []
+    data = response.json()
+    call_recordings = data.get('call_recordings', [])
+    funding_info = data.get('funding_info', [])
 
-        for recording in recordings:
-            call_recordings.append({
-                'id': recording['id'],
-                'title': recording['title'],
-                'duration': recording['duration']
-            })
-            funding_info.append({
-                'recording_id': recording['id'],
-                'funding_amount': recording['funding']['amount'],
-                'currency': recording['funding']['currency']
-            })
+    results = []
+    for recording in call_recordings:
+        recording_id = recording.get('id')
+        related_funding = [fund for fund in funding_info if fund['recording_id'] == recording_id]
+        results.append({
+            'recording': recording,
+            'funding_info': related_funding
+        })
 
-        return jsonify({
-            'call_recordings': call_recordings,
-            'funding_info': funding_info
-        }), 200
-    except requests.exceptions.RequestException as e:
-        return jsonify({'message': str(e)}), 500
+    return jsonify(results)
 
 if __name__ == '__main__':
     app.run(debug=True)
