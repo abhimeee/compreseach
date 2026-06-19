@@ -5,7 +5,7 @@ app = Flask(__name__)
 
 # Configuration for the external API and token-based authentication
 EXTERNAL_API_URL = 'https://external.api/call_recordings'
-TOKEN = 'your_actual_token_here'  # Replace with your token
+TOKEN = '<YOUR_TOKEN_HERE>'  # To be set in environment variables
 
 @app.route('/api/call_recordings', methods=['GET'])
 def fetch_call_recordings():
