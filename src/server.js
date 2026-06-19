@@ -1,14 +1,16 @@
+'use strict';
+
 const express = require('express');
-const callRecordings = require('./api/callRecordings');
+const callRecordingRoutes = require('./api/call_recordings');
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const port = process.env.PORT || 3000;
 
 app.use(express.json());
 
-// Use call recordings API
-app.use('/api', callRecordings);
+// Use call recording routes
+app.use('/api', callRecordingRoutes);
 
-app.listen(PORT, () => {
-    console.log(`Server is running on port ${PORT}`);
+app.listen(port, () => {
+    console.log(`API server listening on port ${port}`);
 });
