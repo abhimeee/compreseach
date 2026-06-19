@@ -1,36 +1,36 @@
-const express = require('express');
-const fetch = require('node-fetch');
-const { authenticate } = require('./authMiddleware');
+const axios = require('axios');
+const { authenticateToken } = require('../middleware/auth');
 
-const router = express.Router();
-
-// Mock external API endpoint for fetching call recordings
-const EXTERNAL_CALL_RECORDINGS_API = 'https://external-api.com/call-recordings';
-
-router.get('/call-recordings', authenticate, async (req, res) => {
+// Middleware for token-based authentication
+const fetchCallRecordings = async (req, res) => {
     try {
-        const response = await fetch(EXTERNAL_CALL_RECORDINGS_API);
-        const callRecordings = await response.json();
+        // Token-based authentication
+        authenticateToken(req, res);
 
-        // Assuming each recording has an associated funding info
-        const fundingInfo = await fetchFundingInfo(callRecordings);
+        // Fetch call recordings from external API
+        const response = await axios.get('https://external-api.com/call-recordings');
+        const callRecordings = response.data;
 
-        return res.json({
-            callRecordings,
-            fundingInfo
+        // Fetch funding info related to each recording
+        const fundingPromises = callRecordings.map(recording => 
+            axios.get(`https://external-api.com/funding/${recording.id}`) // Assuming ID is used for fetching funding
+        );
+
+        const fundingInfo = await Promise.all(fundingPromises);
+
+        // Structure response
+        const responseData = callRecordings.map((recording, index) => {
+            return {
+                recording,
+                funding: fundingInfo[index].data
+            };
         });
+
+        return res.status(200).json(responseData);
     } catch (error) {
-        return res.status(500).json({ error: 'Failed to fetch call recordings.' });
+        console.error(error);
+        return res.status(500).send('Internal Server Error');
     }
-});
+};
 
-async function fetchFundingInfo(callRecordings) {
-    // Mock implementation to fetch funding info related to call recordings
-    // Ideally, an external API call to fetch funding info should be placed here
-    return callRecordings.map(recording => ({
-        id: recording.id,
-        funding: Math.floor(Math.random() * 1000) // Dummy funding amount
-    }));
-}
-
-module.exports = router;
+module.exports = { fetchCallRecordings };
