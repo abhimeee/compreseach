@@ -1,11 +1,17 @@
+'use strict';
+
 const express = require('express');
-const callRecordings = require('./callRecordings');
+const callRecordingsRoutes = require('./callRecordings');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-app.use('/api', callRecordings);
+// Middleware
+app.use(express.json());
+
+// API Routes
+app.use('/api', callRecordingsRoutes);
 
 app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
+    console.log(`Server is running on port ${PORT}`);
 });
