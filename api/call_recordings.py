@@ -1,45 +1,40 @@
 from flask import Flask, request, jsonify
 import requests
-from functools import wraps
 
 app = Flask(__name__)
 
-# Mock external API config
-EXTERNAL_API_ENDPOINT = 'https://external-api.com/call_recordings'
+# Token-based authentication middleware
+@app.before_request
+def authenticate():
+    token = request.headers.get('Authorization')
+    if not token or token != 'Bearer YOUR_TOKEN_HERE':  # Replace with real token validation
+        return jsonify({'error': 'Unauthorized'}), 401
 
-# Token-based authentication decorator
-def token_required(f):
-    @wraps(f)
-    def decorated(*args, **kwargs):
-        token = request.headers.get('Authorization')
-        if not token:
-            return jsonify({'message': 'Token is missing!'}), 403
-        # Here you would normally verify the token
-        return f(*args, **kwargs)
-    return decorated
-
-# Fetch call recordings
-@app.route('/api/call_recordings', methods=['GET'])
-token_required  # Token authentication
+@app.route('/api/call-recordings', methods=['GET'])
 def get_call_recordings():
-    response = requests.get(EXTERNAL_API_ENDPOINT)
+    # Fetch call recordings from external API
+    response = requests.get('https://external.api/callRecordings')  # Replace with real external API URL
     if response.status_code != 200:
-        return jsonify({'message': 'Failed to fetch call recordings'}), 500
+        return jsonify({'error': 'Failed to fetch call recordings'}), 500
 
-    data = response.json()
-    call_recordings = data.get('call_recordings', [])
-    funding_info = data.get('funding_info', [])
+    call_data = response.json()
+    result = []
 
-    results = []
-    for recording in call_recordings:
-        recording_id = recording.get('id')
-        related_funding = [fund for fund in funding_info if fund['recording_id'] == recording_id]
-        results.append({
-            'recording': recording,
-            'funding_info': related_funding
-        })
+    # Process call recordings
+    for recording in call_data['recordings']:
+        recording_info = {
+            'id': recording['id'],
+            'recording_url': recording['url'],
+            'funding_info': get_funding_info(recording['id'])  # Call funding retrieval function
+        }
+        result.append(recording_info)
 
-    return jsonify(results)
+    return jsonify({'call_recordings': result}), 200
+
+def get_funding_info(recording_id):
+    # Fetch funding information associated with a recording
+    funding_response = requests.get(f'https://external.api/funding/{recording_id}')  # Replace with real funding API
+    return funding_response.json() if funding_response.status_code == 200 else None
 
 if __name__ == '__main__':
     app.run(debug=True)
