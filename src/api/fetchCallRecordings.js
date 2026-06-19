@@ -1,43 +1,49 @@
-const express = require('express');
 const axios = require('axios');
-const router = express.Router();
+const express = require('express');
 const jwt = require('jsonwebtoken');
 
+const app = express();
+
 // Middleware for token-based authentication
-router.use((req, res, next) => {
+app.use((req, res, next) => {
     const token = req.headers['authorization'];
-    if (token) {
-        jwt.verify(token, 'your-secret-key', (err, decoded) => {
-            if (err) return res.status(403).json({ message: 'Token is invalid' });
-            next();
-        });
-    } else {
-        res.status(403).json({ message: 'No token provided' });
-    }
+    if (!token) return res.status(401).send('Access Denied');
+    jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
+        if (err) return res.status(403).send('Invalid Token');
+        req.user = user;
+        next();
+    });
 });
 
-// API endpoint to fetch call recordings
-router.get('/call-recordings', async (req, res) => {
+// Endpoint to fetch call recordings and funding info
+app.get('/api/call-recordings', async (req, res) => {
     try {
-        const response = await axios.get('https://external.api/call-recordings');
-        const callRecordings = response.data;
+        // Fetch call recordings from the external API
+        const recordingsResponse = await axios.get('https://external-api.com/call-recordings');
+        const recordings = recordingsResponse.data;
 
-        // Assuming funding information is present in the response structure
-        const fundingInfo = await Promise.all(callRecordings.map(async (recording) => {
-            const fundingResponse = await axios.get(`https://external.api/funding/${recording.fundingId}`);
+        // Fetch funding info for each recording
+        const fundingPromises = recordings.map(async (recording) => {
+            const fundingResponse = await axios.get(`https://external-api.com/funding/${recording.id}`);
             return fundingResponse.data;
-        }));
+        });
 
-        // Structuring response
-        const structuredResponse = callRecordings.map((recording, index) => ({
+        const fundingInfos = await Promise.all(fundingPromises);
+
+        // Structure the response
+        const responseData = recordings.map((recording, index) => ({
             recording,
-            funding: fundingInfo[index]
+            fundingInfo: fundingInfos[index],
         }));
 
-        res.status(200).json(structuredResponse);
+        res.json(responseData);
     } catch (error) {
-        res.status(500).json({ message: 'Error fetching data', error: error.message });
+        console.error(error);
+        res.status(500).send('Server Error');
     }
 });
 
-module.exports = router;
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+    console.log(`API running on port ${PORT}`);
+});
