@@ -1,30 +1,41 @@
 const express = require('express');
+const jwt = require('jsonwebtoken');
 const axios = require('axios');
-const { verifyToken } = require('../middleware/auth');
 
 const router = express.Router();
+const API_URL = 'https://external-api.example.com/call-recordings';
 
-// Endpoint to fetch all call recordings
-router.get('/call-recordings', verifyToken, async (req, res) => {
+// Middleware for token-based authentication
+const authenticateToken = (req, res, next) => {
+    const token = req.headers['authorization'] && req.headers['authorization'].split(' ')[1];
+    if (!token) return res.sendStatus(401);
+    jwt.verify(token, process.env.TOKEN_SECRET, (err) => {
+        if (err) return res.sendStatus(403);
+        next();
+    });
+};
+
+// GET endpoint for fetching call recordings
+router.get('/call-recordings', authenticateToken, async (req, res) => {
     try {
-        const response = await axios.get('https://external-api.com/call-recordings');
-        const recordings = response.data;
+        // Fetch call recordings
+        const response = await axios.get(API_URL);
+        const callRecordings = response.data;
 
-        const fundingPromises = recordings.map(recording => 
-            axios.get(`https://external-api.com/funding-info/${recording.id}`)
-        );
+        // Fetch funding information for each call recording
+        const fundingInfoPromises = callRecordings.map(async (recording) => {
+            const fundingResponse = await axios.get(`https://external-api.example.com/funding/${recording.id}`);
+            return { recording, funding: fundingResponse.data };
+        });
 
-        const fundingInfos = await Promise.all(fundingPromises);
+        const callRecordingsWithFunding = await Promise.all(fundingInfoPromises);
 
-        const result = recordings.map((recording, index) => ({
-            recording,
-            fundingInfo: fundingInfos[index].data
-        }));
+        // Structure response
+        res.json(callRecordingsWithFunding);
 
-        res.json(result);
     } catch (error) {
-        console.error('Error fetching data:', error);
-        res.status(500).json({ message: 'Internal Server Error' });
+        console.error(error);
+        res.status(500).send('Error fetching data');
     }
 });
 
