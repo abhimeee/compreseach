@@ -1,0 +1,13 @@
+{
+  "name": "call-recordings-api",
+  "version": "1.0.0",
+  "description": "API for fetching call recordings and funding information",
+  "main": "api/call_recordings.js",
+  "dependencies": {
+    "axios": "^0.21.4",
+    "dotenv": "^17.4.2",
+    "express": "^4.22.2",
+    "jsonwebtoken": "^8.5.1",
+    "node-fetch": "^3.3.2"
+  }
+}
