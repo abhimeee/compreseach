@@ -1,16 +1,14 @@
 const express = require('express');
-const app = express();
-require('dotenv').config();
-const callRecordingsRouter = require('./api/callRecordings');
+const callRecordings = require('./api/callRecordings');
 
-// Middleware for parsing JSON
+const app = express();
+const PORT = process.env.PORT || 3000;
+
 app.use(express.json());
 
-// Use the call recordings API
-app.use('/api', callRecordingsRouter);
+// Use call recordings API
+app.use('/api', callRecordings);
 
-// Starting the server
-const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);
 });

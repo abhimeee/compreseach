@@ -5,35 +5,43 @@ const jwt = require('jsonwebtoken');
 const router = express.Router();
 
 // Middleware for token-based authentication
-function authenticateToken(req, res, next) {
-    const token = req.headers['authorization'] && req.headers['authorization'].split(' ')[1];
-    if (!token) return res.sendStatus(401);
-    jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
-        if (err) return res.sendStatus(403);
-        req.user = user;
+router.use((req, res, next) => {
+    const token = req.headers['authorization']?.split(' ')[1];
+    if (!token) {
+        return res.status(401).json({ error: 'No token provided' });
+    }
+    jwt.verify(token, 'your_secret_key', (err, decoded) => {
+        if (err) {
+            return res.status(401).json({ error: 'Unauthorized' });
+        }
+        req.user = decoded;
         next();
     });
-}
+});
 
-// Endpoint to fetch call recordings and funding info
-router.get('/call-recordings', authenticateToken, async (req, res) => {
+// Fetch call recordings
+router.get('/call-recordings', async (req, res) => {
     try {
-        const callRecordingsResponse = await axios.get('https://external-api.example.com/call-recordings');
-        const fundingInfoResponse = await axios.get('https://external-api.example.com/funding-info');
+        const response = await axios.get('https://external-api.com/call-recordings');
+        const callRecords = response.data;
 
-        // Process and structure the response
-        const callRecordings = callRecordingsResponse.data;
-        const fundingInfo = fundingInfoResponse.data;
+        // Fetch funding information for each call recording
+        const fundingResponses = await Promise.all(callRecords.map(record => 
+            axios.get(`https://external-api.com/funding/${record.id}`)
+        ));
 
-        const response = callRecordings.map(recording => ({
-            ...recording,
-            funding: fundingInfo.find(fund => fund.recordingId === recording.id)
-        }));
+        // Structure response
+        const structuredResponse = callRecords.map((record, index) => {
+            return {
+                callRecording: record,
+                fundingInfo: fundingResponses[index].data
+            };
+        });
 
-        res.json(response);
+        return res.json(structuredResponse);
     } catch (error) {
-        console.error('Error fetching data:', error);
-        res.status(500).send('Internal Server Error');
+        console.error('Error fetching call recordings:', error);
+        return res.status(500).json({ error: 'Internal Server Error' });
     }
 });
 
