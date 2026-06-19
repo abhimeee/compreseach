@@ -6,41 +6,37 @@ const router = express.Router();
 
 // Middleware for token-based authentication
 const authenticateToken = (req, res, next) => {
-    const token = req.headers['authorization'] && req.headers['authorization'].split(' ')[1];
+    const token = req.headers['authorization']?.split(' ')[1];
     if (!token) return res.sendStatus(401);
-
-    jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
+    jwt.verify(token, process.env.TOKEN_SECRET, (err, user) => {
         if (err) return res.sendStatus(403);
         req.user = user;
         next();
     });
 };
 
-// Endpoint to fetch all call recordings and corresponding funding info
+// API endpoint for fetching call recordings and their funding info
 router.get('/call-recordings', authenticateToken, async (req, res) => {
     try {
-        // Fetch call recordings from external API
-        const callRecordingsResponse = await axios.get('https://externalapi.com/callrecordings');
-        const callRecordings = callRecordingsResponse.data;
+        const response = await axios.get('https://external-api.com/call-recordings');
+        const callRecordings = response.data;
+        const fundingInfo = await Promise.all(
+            callRecordings.map(async (recording) => {
+                const fundingResponse = await axios.get(`https://external-api.com/funding/${recording.id}`);
+                return fundingResponse.data;
+            })
+        );
 
-        const fundingInfoPromises = callRecordings.map(async (recording) => {
-            // Fetch funding info for each call recording
-            const fundingResponse = await axios.get(`https://externalapi.com/funding/${recording.id}`);
-            return fundingResponse.data;
-        });
-
-        const fundingInfos = await Promise.all(fundingInfoPromises);
-
-        // Structure the response
-        const response = callRecordings.map((recording, index) => ({
+        // Structuring response
+        const structuredResponse = callRecordings.map((recording, index) => ({
             recording,
-            funding: fundingInfos[index],
+            funding: fundingInfo[index]
         }));
 
-        res.json(response);
+        res.status(200).json(structuredResponse);
     } catch (error) {
-        console.error('Error fetching data:', error);
-        res.status(500).send('Internal Server Error');
+        console.error(error);
+        res.status(500).json({ error: 'Internal server error' });
     }
 });
 
