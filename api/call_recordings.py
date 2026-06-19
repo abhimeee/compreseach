@@ -3,14 +3,14 @@ import requests
 
 app = Flask(__name__)
 
-# Authentication decorator example
+# This file will include necessary imports and APIs for call recordings. Authentication decorator example
 @app.before_request
 def require_token():
     token = request.headers.get('Authorization')
     if not token or token != 'Bearer YOUR_SECURE_TOKEN':
         return jsonify({'error': 'Unauthorized'}), 401
 
-# Fetch call recordings endpoint
+# This file will include necessary imports and APIs for call recordings. Fetch call recordings endpoint
 @app.route('/api/call_recordings', methods=['GET'])
 def fetch_call_recordings():
     external_api_url = 'https://external.api/call_recordings'
